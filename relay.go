@@ -27,7 +27,7 @@ import (
 // retour arriere tient en un rm — ce qui compte pour un reglage qui touche le chemin P2P du
 // jeu le plus frequente.
 var (
-	relayFlagPath = relayStrEnv("MK8_RELAY_FILE", "/nat/relay_on_mk8")
+	relayFlagPath = relayStrEnv("MK8_RELAY_FILE", "/opt/mk8cs/relay_on_mk8")
 	relayPortBase = relayIntEnv("MK8_RELAY_PORT_BASE", 31100)
 	relayPortSpan = relayIntEnv("MK8_RELAY_PORT_SPAN", 900)
 

@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	listePath = relayStrEnv("MK8_RELAY_ALLOW", "/nat/relay_allow_mk8")
+	listePath = relayStrEnv("MK8_RELAY_ALLOW", "/opt/mk8cs/relay_allow_mk8")
 
 	listeMu      sync.Mutex
 	listeSignatu string
