@@ -113,6 +113,14 @@ func main() {
 	secureEndpoint.StartReaper()
 	go startDashboard(secureEndpoint, mm)
 
+	// Relais de station. Le port UDP ecoute toujours ; la SUBSTITUTION est armee par le
+	// fichier interrupteur (/nat/relay_on_mk8), et la liste des autorises par
+	// /nat/relay_allow_mk8. Sans liste, PERSONNE n est relaye, meme arme : c est la regle
+	// qui a manque le 2026-08-30, ou trois essais de suite ont touche des joueurs qui
+	// n avaient rien demande.
+	startRelayWatcher()
+	startListeWatcher()
+
 	// When the auth is fronted by a TLS-passthrough proxy (Traefik on the shared :443),
 	// enable PROXY protocol so the auth sees the console's REAL IP. Without it the login PID is
 	// remembered under Traefik's internal IP (10.0.1.x), and MK8's TICKETLESS secure CONNECT —
@@ -237,6 +245,7 @@ func resolveUser(username string, extraData []byte) (uint64, []byte, bool) {
 var revokedNexPayloads = map[string]bool{
 	"1800000006.Kazuu.1787343209": true, // fuite release 1.6.5-win (Kazuu / PID 1800000006)
 }
+
 // nextendoPIDFromToken validates a "nx2.<b64(pid.username.expiry)>.<b64(hmac)>"
 // token signed by the account service (HMAC-SHA256, "nex:" prefix).
 func nextendoPIDFromToken(s string) (uint64, bool) {

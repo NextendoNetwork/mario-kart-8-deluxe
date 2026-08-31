@@ -2,7 +2,7 @@ module github.com/NextendoNetwork/mario-kart-8-deluxe
 
 go 1.23.0
 
-require github.com/NextendoNetwork/nextendo-nex v0.1.5-0.20260813125735-967c90247487
+require github.com/NextendoNetwork/nextendo-nex v0.2.0
 
 require (
 	github.com/klauspost/compress v1.17.9 // indirect
