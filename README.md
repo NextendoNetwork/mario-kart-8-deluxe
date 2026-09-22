@@ -27,7 +27,7 @@ cp example.env .env    # then edit .env
 go run .
 ```
 
-Configuration is entirely through environment variables — see [`example.env`](example.env). No
+Configuration is entirely through environment variables: see [`example.env`](example.env). No
 secrets are baked into the source: the auth/secure password, internal key, and token secret are all
 read from the environment at startup.
 
@@ -40,5 +40,5 @@ from the game itself, not a secret.
 
 ## License
 
-Released under the **[PolyForm Shield License 1.0.0](LICENSE.md)** — source-available: read, use,
+Released under the **[PolyForm Shield License 1.0.0](LICENSE.md)**, source-available: read, use,
 modify, and self-host, but do not use it to provide a product that competes with Nextendo Network.
