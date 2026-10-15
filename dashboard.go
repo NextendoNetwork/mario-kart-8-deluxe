@@ -331,7 +331,22 @@ type apiStats struct {
 	Methods        []apiMethod    `json:"methods"`
 }
 
-func dispName(pid uint64) string { return fmt.Sprintf("Joueur-%d", pid%100000) }
+// dispName : le nom que le joueur a depose dans son profil MK8 (le pseudo en jeu,
+// sinon le nom du Mii), lu par le coeur. Sans profil : un nom tire du PID. Un
+// profil sans aucun nom lisible le dit, pour qu'on le remarque.
+func dispName(pid uint64) string {
+	miiName, nickname, ok := nex.CommonDataNamesForPID(pid)
+	if !ok {
+		return fmt.Sprintf("Joueur-%d", pid%100000)
+	}
+	if nickname != "" {
+		return nickname
+	}
+	if miiName != "" {
+		return miiName
+	}
+	return fmt.Sprintf("(sans nom) Joueur-%d", pid%100000)
+}
 
 func buildStats(endpoint *nex.Endpoint, mm *nex.Matchmaking) apiStats {
 	conns := endpoint.SnapshotConnections()
