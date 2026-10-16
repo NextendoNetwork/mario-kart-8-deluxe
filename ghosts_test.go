@@ -96,6 +96,32 @@ func TestGhostRoundTrip(t *testing.T) {
 	if len(ghosts.Records[me.PID]) != 23 {
 		t.Fatalf("%d records au lieu de 23", len(ghosts.Records[me.PID]))
 	}
+	if ghosts.Objects[id].Score != 111967 {
+		t.Fatalf("temps du fantome : %d", ghosts.Objects[id].Score)
+	}
+
+	// un circuit de la liste de records (0x40) sans fantome envoye : ni classement, ni record
+	// d ami, sinon le jeu demande un fantome introuvable (2306-1204)
+	other := nex.NewStreamOut(s)
+	other.U8(0)
+	other.U32(0x40)
+	other.U8(0)
+	ord := nex.NewStreamOut(s)
+	ord.U8(0)
+	ord.U8(0xff)
+	ord.U8(0)
+	ord.U8(2)
+	ord.U32(0)
+	ord.U8(10)
+	other.Buffer(ord.Bytes())
+	other.U64(0)
+	other.U64(0)
+	empty := getRanking(friend, &nex.RMCMessage{Method: methodGetRanking, CallID: 9, Body: other.Bytes()})
+	ein := nex.NewStreamIn(empty.Body, s)
+	_ = ein.U8()
+	if n := ein.Substream().U32(); n != 0 {
+		t.Fatalf("classement d un circuit sans fantome : %d entree(s)", n)
+	}
 
 	// le classement du circuit 11, demandé comme la capture
 	rk := getRanking(friend, &nex.RMCMessage{Method: methodGetRanking, CallID: 5, Body: unhex(t, capGetRanking)})

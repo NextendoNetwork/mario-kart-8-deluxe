@@ -63,8 +63,9 @@ type ghostObject struct {
 	Size  uint32 `json:"size"`
 	At    int64  `json:"at"`
 	Done  bool   `json:"done"`
-	Token string `json:"token"`         // secret des adresses d envoi et de lecture (id devinable sinon)
-	Old   int64  `json:"old,omitempty"` // remplace par un fantome plus recent (date) : efface apres ghostReplacedTTL
+	Token string `json:"token"`           // secret des adresses d envoi et de lecture (id devinable sinon)
+	Old   int64  `json:"old,omitempty"`   // remplace par un fantome plus recent (date) : efface apres ghostReplacedTTL
+	Score uint32 `json:"score,omitempty"` // son temps (Ranking 19 qui suit l envoi) : ce que montrent classement et records
 }
 
 type ghostRecord struct {
@@ -100,8 +101,15 @@ func loadGhosts(dir string) *ghostStore {
 		}
 	}
 	fmt.Printf("[MK8 Fantomes] %d fantome(s), %d joueur(s) avec des records, dossier %s\n", len(g.Objects), len(g.Records), dir)
-	// les fantomes deposes avant les secrets d adresse (16/10) en recoivent un
+	// les fantomes deposes avant les secrets d adresse (16/10) en recoivent un ; ceux d avant le
+	// temps par fantome prennent le record du joueur sur ce circuit
 	for _, o := range g.Objects {
+		if o.Score == 0 && o.Done && o.Old == 0 {
+			if rec, ok := g.Records[o.Owner][o.Slot]; ok {
+				o.Score = rec.Score
+				g.dirty = true
+			}
+		}
 		if o.Token == "" {
 			o.Token = newToken()
 			g.dirty = true
@@ -181,6 +189,20 @@ func (g *ghostStore) save() {
 }
 
 func slotKey(pid uint64, slot uint16) string { return fmt.Sprintf("%d:%d", pid, slot) }
+
+// ghostOf : le fantome en place d un joueur sur un circuit, telechargeable et avec son temps, ou
+// nil (sous verrou).
+func (g *ghostStore) ghostOf(pid uint64, slot uint16) *ghostObject {
+	id, ok := g.Slots[slotKey(pid, slot)]
+	if !ok {
+		return nil
+	}
+	o := g.Objects[id]
+	if o == nil || !o.Done || o.Old != 0 || o.Score == 0 {
+		return nil
+	}
+	return o
+}
 
 func (g *ghostStore) file(id uint64) string { return filepath.Join(g.dir, fmt.Sprintf("%d.bin", id)) }
 
@@ -459,6 +481,12 @@ func uploadScorePack(conn *nex.Connection, req *nex.RMCMessage) *nex.RMCMessage 
 	}
 	if in.Err() == nil {
 		keep(uint16(category), score)
+		// le fantome que le joueur vient d envoyer sur ce circuit porte ce temps
+		if id, ok := ghosts.Slots[slotKey(conn.PID, uint16(category))]; ok {
+			if o := ghosts.Objects[id]; o != nil && o.Done && (o.Score == 0 || time.Now().Unix()-o.At < 600) {
+				o.Score = score
+			}
+		}
 	}
 	ghosts.dirty = true
 	ghosts.mu.Unlock()
@@ -479,13 +507,16 @@ func getScorePack(conn *nex.Connection, req *nex.RMCMessage) *nex.RMCMessage {
 	found := 0
 	ghosts.mu.Lock()
 	for _, pid := range pids {
-		r, ok := ghosts.Records[pid][category]
-		if !ok {
+		// un temps sans fantome telechargeable (venu de la liste de records d un joueur, envoyee
+		// avant les fantomes ou avec ceux d autres circuits) : le jeu demanderait un fantome
+		// introuvable, erreur 2306-1204 (16/10). Seulement les fantomes en place, a leur temps.
+		o := ghosts.ghostOf(pid, category)
+		if o == nil {
 			body.QBuffer(nil)
 			continue
 		}
 		found++
-		body.QBuffer([]byte{byte(r.Score), byte(r.Score >> 8), byte(r.Score >> 16), byte(r.Score >> 24), byte(category), byte(category >> 8)})
+		body.QBuffer([]byte{byte(o.Score), byte(o.Score >> 8), byte(o.Score >> 16), byte(o.Score >> 24), byte(category), byte(category >> 8)})
 	}
 	ghosts.mu.Unlock()
 	fmt.Printf("[MK8 Fantomes] records des amis pid=%d circuit=%d : %d/%d\n", conn.PID, category, found, len(pids))
@@ -531,10 +562,13 @@ func getRanking(conn *nex.Connection, req *nex.RMCMessage) *nex.RMCMessage {
 
 	var list []rankedTime
 	ghosts.mu.Lock()
-	for p, rec := range ghosts.Records {
-		if r, ok := rec[uint16(category)]; ok {
-			list = append(list, rankedTime{p, r.Score, r.At})
+	for key, id := range ghosts.Slots {
+		o := ghosts.Objects[id]
+		if o == nil || o.Slot != uint16(category) || ghosts.ghostOf(o.Owner, o.Slot) != o {
+			continue
 		}
+		_ = key
+		list = append(list, rankedTime{o.Owner, o.Score, o.At})
 	}
 	ghosts.mu.Unlock()
 	sort.Slice(list, func(i, j int) bool {
