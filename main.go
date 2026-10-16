@@ -85,7 +85,8 @@ func main() {
 	secureEndpoint.Register(nex.ProtocolMatchMaking, mm.MatchMakingHandler())
 	secureEndpoint.Register(nex.ProtocolMatchMakingExt, mm.MatchMakingExtHandler())
 	secureEndpoint.Register(nex.ProtocolNATTraversal, nex.NATTraversalHandler())
-	secureEndpoint.Register(nex.ProtocolRanking, nex.RankingHandler())
+	secureEndpoint.Register(nex.ProtocolRanking, rankingWithGhosts(nex.RankingHandler())) // + contre-la-montre (ghosts.go)
+	secureEndpoint.Register(protocolDataStore, dataStoreHandler())                         // fantomes (ghosts.go)
 	secureEndpoint.Register(nex.ProtocolUtility, nex.UtilityHandler())
 	logSecure := logRMC("Secure")
 	secureEndpoint.OnRMC = func(c *nex.Connection, req *nex.RMCMessage) {
@@ -105,6 +106,7 @@ func main() {
 		mm.RemovePlayer(c.PID)
 	}
 	secureServer := nex.NewServer(secureEndpoint)
+	secureServer.CustomHTTPHandler = ghostHTTP // envoi et lecture des fantomes, sur le port TLS secure
 
 	// Monitoring: per-game /api/stats for the unified Nextendo dashboard.
 	// Éviction automatique des connexions mortes. Sans elle, une session perdue (crash,
